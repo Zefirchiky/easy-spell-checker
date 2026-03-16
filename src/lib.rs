@@ -1,5 +1,3 @@
-#![feature(exact_div)]
-
 use std::{cmp::Ordering, path::Path, str::from_utf8_unchecked};
 
 use rayon::prelude::*;
@@ -47,13 +45,13 @@ pub struct WordId {
 }
 
 #[derive(Debug, Clone)]
-pub struct LenGroup {
+pub struct WordGroup {
     blob: String,
     len: usize,
     count: usize,
 }
 
-impl LenGroup {
+impl WordGroup {
     pub fn empty(len: usize) -> Self {
         Self {
             blob: String::new(),
@@ -95,7 +93,6 @@ impl LenGroup {
     }
 
     fn find_word_in_slice_binary_search(word: &[u8], slice: &[u8]) -> BinarySearchWordResult {
-        // TODO: move into LenGroup
         // Supports both ascii and utf-8 without a problem
         let mut low = 0usize;
         let mut high = slice.len().checked_div(word.len()).unwrap();
@@ -118,7 +115,7 @@ impl LenGroup {
 
 #[derive(Default)]
 pub struct SpellChecker {
-    pub word_groups: Vec<LenGroup>,
+    pub word_groups: Vec<WordGroup>,
     /// Sets the maximum difference between words to be considered similar.
     ///
     /// This value is used in the suggest method to determine how many words to suggest.
@@ -241,7 +238,7 @@ impl SpellChecker {
         })
     }
 
-    pub fn find_closest<'a>(&self, word: &str) -> Option<(&LenGroup, BinarySearchWordResult)> {
+    pub fn find_closest<'a>(&self, word: &str) -> Option<(&WordGroup, BinarySearchWordResult)> {
         let group = self.word_groups.get(word.len())?;
         Some((group, group.find_closest(word)?))
     }

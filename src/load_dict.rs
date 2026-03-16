@@ -1,4 +1,4 @@
-use crate::LenGroup;
+use crate::WordGroup;
 use std::{fs, path::Path};
 
 /// Loads a words dictionary from a given file.
@@ -13,7 +13,7 @@ use std::{fs, path::Path};
 /// This function is io bound, and will take up to `4ms` on a low end hardware.
 pub fn load_words_dict<T: AsRef<Path>>(
     file: T,
-) -> Result<Vec<LenGroup>, Box<dyn std::error::Error>> {
+) -> Result<Vec<WordGroup>, Box<dyn std::error::Error>> {
     let content = fs::read_to_string(file)?; // About 2 ms
     
     let lines: Vec<&str> = content.lines().collect();
@@ -48,7 +48,7 @@ pub fn load_words_dict<T: AsRef<Path>>(
     for (idx, entry) in group_map.into_iter().enumerate() {
         let len = idx + 1;
         let (blob, count) = entry.unwrap_or_else(|| (String::new(), 0));
-        result.push(LenGroup { blob, len, count });
+        result.push(WordGroup { blob, len, count });
     }
 
     Ok(result)

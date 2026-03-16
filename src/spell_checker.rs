@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use filess::{Json, ModelFileTrait};
+use filess::{Json, ModelFile};
 use serde::{Deserialize, Serialize};
 
 use crate::{DictMetadata, Language, spell_checkers::{SpellCheckerTrait, ascii, normalized, utf8}};
@@ -15,27 +15,31 @@ pub struct SpellChecker<L: Language> {
 }
 
 impl<L: Language> SpellChecker<L> {
-    pub fn new() -> Result<Self, <Json as ModelFileTrait>::Error> {
+    pub fn new() -> Result<Self, <Json as ModelFile>::Error> {
         let file = Json::new(format!("{}.json", L::name()));
 
         file.load_model::<Self>()
     }
 
-    pub fn new_with_file<F: filess::ModelFileTrait>(file: F) -> Result<Self, F::Error> {
+    pub fn new_with_file<F: filess::ModelFile>(file: F) -> Result<Self, F::Error> {
         file.load_model::<Self>()
     }
 
     pub fn check(&self, word: &str) -> bool {   // FIXME: Branching may add overhead, compiling this for each language with their checkers would be best
         if let Some(checker) = &self.ascii_checker {
-            return checker.check(word)
+            if checker.check(word) { return true }
         }
         if let Some(checker) = &self.norm_checker {
-            return checker.check(word)
+            if checker.check(word) { return true }
         }
         if let Some(checker) = &self.utf8_checker {
-            return checker.check(word)
+            if checker.check(word) { return true }
         }
 
         false
+    }
+
+    pub fn spell(&self, _word: &str) -> Vec<&str> {
+        vec![]
     }
 }
