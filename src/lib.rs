@@ -2,21 +2,21 @@ use std::{cmp::Ordering, path::Path, str::from_utf8_unchecked};
 
 use rayon::prelude::*;
 
+mod dict_creator;
+mod dict_metadata;
+mod english;
+mod language;
 mod load_dict;
 mod matching;
-pub mod spell_checkers;
 mod spell_checker;
-mod language;
-mod dict_metadata;
-mod dict_creator;
-mod english;
+pub mod spell_checkers;
 
-pub use spell_checker::SpellChecker as SC;
+pub use dict_creator::SpellCheckerBuilder;
+pub use dict_metadata::DictMetadata;
+pub use english::English;
 pub use language::Language;
 pub use load_dict::load_words_dict;
-pub use dict_metadata::DictMetadata;
-pub use dict_creator::SpellCheckerBuilder;
-pub use english::English;
+pub use spell_checker::SpellChecker as SC;
 
 static DICT_VERSION: usize = 1;
 

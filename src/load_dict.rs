@@ -15,7 +15,7 @@ pub fn load_words_dict<T: AsRef<Path>>(
     file: T,
 ) -> Result<Vec<WordGroup>, Box<dyn std::error::Error>> {
     let content = fs::read_to_string(file)?; // About 2 ms
-    
+
     let lines: Vec<&str> = content.lines().collect();
 
     if lines.is_empty() {

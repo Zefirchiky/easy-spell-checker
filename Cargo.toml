@@ -7,7 +7,7 @@ license-file = "LICENSE"
 repository = "https://github.com/Zefirchiky/SpelRight"
 
 [dependencies]
-filess = { version = "0.3.2", default-features = false, features = ["json", "serde"] }
+filess = { version = "0.6.2", default-features = false, features = ["serde_json"] }
 rayon = "1.11.0"
 serde = { version = "1.0.228", features = ["serde_derive"] }
 serde_json = "1.0.149"

@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{WordId, spell_checkers::{SpellCheckerTrait, simple_len_group::WordGroup}};
+use crate::{
+    WordId,
+    spell_checkers::{SpellCheckerTrait, simple_len_group::WordGroup},
+};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SpellChecker {
@@ -18,6 +21,8 @@ impl SpellChecker {
 }
 
 impl SpellCheckerTrait for SpellChecker {
+    type Group = WordGroup;
+    
     fn get(&self, word: WordId) -> Option<&str> {
         let wg = self.groups.get(word.len)?;
         if word.offset >= wg.blob.len() {
@@ -34,12 +39,16 @@ impl SpellCheckerTrait for SpellChecker {
             .expect(&format!("LenGroup of len {} should exist", word.len));
         &lg.blob[word.offset..word.offset + word.len]
     }
-
-    fn check(&self, word: &str) -> bool {
-        let group = self.groups.get(word.len());
-        match group {
-            Some(wg) => wg.check(word),
-            None => false,
-        }
+    
+    fn find(&self, word: &str) -> Option<WordId> {
+        let group = self.groups.get(word.len())?;
+        Some(WordId {
+            len: group.len,
+            offset: group.find(word)?.0,
+        })
+    }
+    
+    fn suggest_for_word(&self, word: &str) -> Vec<(&str, usize)> {
+        
     }
 }

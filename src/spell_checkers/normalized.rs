@@ -27,9 +27,7 @@ pub struct WordGroup {
     pub len: usize,
 }
 
-impl WordGroup {
-    
-}
+impl WordGroup {}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SpellChecker {

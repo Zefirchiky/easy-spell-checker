@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{WordId, spell_checkers::{SpellCheckerTrait, simple_len_group::WordGroup}};
+use crate::{
+    WordId,
+    spell_checkers::{SpellCheckerTrait, simple_len_group::WordGroup},
+};
 
 pub struct LenGroup {}
 
@@ -11,9 +14,7 @@ pub struct SpellChecker {
 
 impl SpellChecker {
     pub fn new(groups: Vec<WordGroup>) -> Self {
-        Self {
-            groups
-        }
+        Self { groups }
     }
 }
 

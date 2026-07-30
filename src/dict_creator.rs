@@ -1,6 +1,9 @@
 use std::marker::PhantomData;
 
-use crate::{DICT_VERSION, DictMetadata, Language, SC, spell_checkers::{ascii, normalized, utf8, words_to_groups}};
+use crate::{
+    DICT_VERSION, DictMetadata, Language, SC,
+    spell_checkers::{ascii, normalized, utf8, words_to_groups},
+};
 
 #[derive(Debug, Default)]
 pub struct SpellCheckerBuilder<L: Language> {
@@ -24,7 +27,7 @@ impl<L: Language + Default> SpellCheckerBuilder<L> {
     }
 
     /// WIP
-    /// 
+    ///
     /// Normalized words will be checked against their ascii counterparts
     /// and mapped to utf-8 forms
     pub fn add_norm_words(&mut self, _words: Vec<String>) -> Option<&mut Self> {
@@ -55,9 +58,15 @@ impl<L: Language + Default> SpellCheckerBuilder<L> {
 
     pub fn build(&mut self) -> SC<L> {
         let mut encodings = vec![];
-        if self.ascii.is_some() { encodings.push("ascii".to_owned()) }
-        if self.norm.is_some() { encodings.push("normalized".to_owned()) }
-        if self.utf8.is_some() { encodings.push("utf-8".to_owned()) }
+        if self.ascii.is_some() {
+            encodings.push("ascii".to_owned())
+        }
+        if self.norm.is_some() {
+            encodings.push("normalized".to_owned())
+        }
+        if self.utf8.is_some() {
+            encodings.push("utf-8".to_owned())
+        }
         SC {
             ascii_checker: self.ascii.take(),
             norm_checker: self.norm.take(),

@@ -73,12 +73,18 @@ pub fn find_word_in_slice_binary_search(word: &[u8], slice: &[u8]) -> BinarySear
 }
 
 pub fn words_to_groups(mut words: Vec<String>) -> Option<Vec<WordGroup>> {
-    words = words.par_iter().filter(|w| w.is_empty()).map(|w| w.to_lowercase()).collect();
-    if words.is_empty() { return None }
-    
-    words.sort_unstable_by(|w1, w2| w1.len().cmp(&w2.len()).then(w1.cmp(w2)));  // TODO: Check if unstable preserves needed order
+    words = words
+        .par_iter()
+        .filter(|w| w.is_empty())
+        .map(|w| w.to_lowercase())
+        .collect();
+    if words.is_empty() {
+        return None;
+    }
+
+    words.sort_unstable_by(|w1, w2| w1.len().cmp(&w2.len()).then(w1.cmp(w2))); // TODO: Check if unstable preserves needed order
     let biggest_len = words.last().unwrap().len();
-    
+
     let mut groups: Vec<WordGroup> = Vec::with_capacity(biggest_len);
     for i in 1..biggest_len {
         groups.push(WordGroup::empty(i))
