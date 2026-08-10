@@ -283,11 +283,7 @@ impl SpellChecker {
                     .par_chunks(group.len)
                     .filter_map(|ch| {
                         if abs_dif == self.max_dif {
-                            if ch[0] != first_char
-                                && ch[0] != last_char
-                                && ch[ch.len() - 1] != first_char
-                                && ch[ch.len() - 1] != last_char
-                            {
+                            if ch[0] != first_char || ch[ch.len() - 1] != last_char {
                                 return None;
                             }
                         }
