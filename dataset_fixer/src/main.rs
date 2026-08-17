@@ -1,8 +1,7 @@
 use std::fs;
 
 fn main() {
-    let file1 = "C:/dev/tools/basic-spellchecker/words_alpha.txt";
-    let file2 = "C:/dev/tools/basic-spellchecker/words.txt";
+    let file1 = Txt::new("C:/dev/tools/basic-spellchecker/words_alpha.txt");
     let dataset = fs::read_to_string(file1).unwrap();
     let mut dataset = dataset
         .lines()

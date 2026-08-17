@@ -1,27 +1,23 @@
 #[cfg(test)]
 mod suggest_tests {
-    use spel_right::SpellChecker;
-
-    static WORDS_FILE: &str = "words.txt";
+    use spel_right::{English, SpellChecker};
 
     #[test]
     fn suggest_correctness() {
-        let checker = SpellChecker::new(WORDS_FILE);
+        let mut checker = SpellChecker::<English>::new();
+        checker.set_max_dist(2);
         assert_eq!(
-            checker.suggest("diferently", 0),
+            checker.suggest("diferently"),
             vec![
                 "differently",
                 "divergently",
-                "referently",
-                "efferently",
-                "afferently"
             ]
         );
     }
 
     #[test]
     fn batch_suggest_30_incorrect_words() {
-        let checker = SpellChecker::new(WORDS_FILE);
+        let checker = SpellChecker::<English>::new();
         let bench_words: [&str; 30] = [
             "teh",         // Transposition (the)
             "quik",        // Omission (quick)
@@ -54,6 +50,6 @@ mod suggest_tests {
             "sistem",      // Substitution (system)
             "funciton",    // Transposition (function)
         ];
-        checker.batch_par_suggest(&bench_words, 10);
+        checker.batch_par_suggest(&bench_words);
     }
 }

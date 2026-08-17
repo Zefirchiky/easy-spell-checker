@@ -1,63 +1,33 @@
 pub mod ascii;
-pub mod normalized;
-pub mod simple_len_group;
-pub mod utf8;
+// pub mod normalized;
+// pub mod utf8;
 
-pub use simple_len_group::words_to_groups;
+use rayon::slice::ParallelSliceMut;
 
-use crate::{WordId, matching};
+use crate::{WordGroup, WordId};
 
 pub enum SpellCheckerTypes {
     Ascii(ascii::SpellChecker),
-    Normalized(normalized::SpellChecker),
-    Utf8(utf8::SpellChecker),
+    // Normalized(normalized::SpellChecker),
+    // Utf8(utf8::SpellChecker),
 }
 
-pub trait SpellCheckerTrait {
+pub trait SpellCheckerTrait: Sync {
     type Group: WordGroup;
+
+    fn max_distance(&self) -> usize;
     
     fn get(&self, word: WordId) -> Option<&str>;
     fn get_unchecked(&self, word: WordId) -> &str;
     fn find(&self, word: &str) -> Option<WordId>;
+    /// Suggest possible words for `word`
     fn suggest_for_word(&self, word: &str) -> Vec<(&str, usize)>;
     
     fn word_to_matching(word: &str) -> &[impl Eq] {
         word.as_bytes()
     }
     
-    #[inline]
-    fn match_word_with_group(&self, group: Self::Group, word: &str) -> Vec<(&str, usize)> {
-        let word_len = word.len();
-        let dif = group.len as isize - word_len as isize;
-        let abs_dif = dif.abs() as usize;
-
-        let max_del = dif.max(0) as usize;
-        let max_ins = (-dif).max(0) as usize;
-        let max_chg = self.max_dif - abs_dif;
-        
-        group
-            .blob
-            .as_bytes()
-            .par_chunks(group.len)
-            .filter_map(|candidate| {
-                if abs_dif == self.max_dif {
-                    if candidate[0] != word[0] && candidate[candidate.len() - 1] != word[word_len - 1] {
-                        return None;
-                    }
-                }
-
-                let (is_ok, dist) =
-                    matching::matches_single(candidate, Self::word_to_matching(word), max_del, max_ins, max_chg);
-                if is_ok {
-                    // Dataset will always be valid, and chars are based on len group. Cant have invalid utf-8.
-                    // Trust
-                    Some((unsafe { std::str::from_utf8_unchecked(candidate) }, dist))
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
+    fn match_word_with_group<'a>(&self, group: &'a Self::Group, word: &str) -> Vec<(&'a str, usize)>;
         
     fn check(&self, word: &str) -> bool {
         self.find(word).is_some()
@@ -65,13 +35,19 @@ pub trait SpellCheckerTrait {
 
     fn suggest_with_distances(&self, word: &str) -> Vec<(&str, usize)> {
         let word = word.to_lowercase();
+        
+        if self.max_distance() == 0 {
+            match self.find(&word) {
+                Some(w) => { return vec![(self.get_unchecked(w), 0)]; }
+                None => { return vec![]; }
+            } 
+        }
 
         if let Some(word) = self.find(&word) {
             return vec![(self.get_unchecked(word), 0)];
         }
 
-        let word_bytes = word.as_bytes();
-        let mut result = self.suggest_for_word(word_bytes);
+        let mut result = self.suggest_for_word(&word);
 
         if result.len() > 1 {
             result.par_sort_unstable_by_key(|(_, dist)| *dist);
@@ -81,23 +57,351 @@ pub trait SpellCheckerTrait {
         result
     }
     
-    /// Suggests words for a given `word` based on the maximum difference.
+    /// Suggests words for a given `word`.
     ///
     /// If the `word` is found in the dataset, returns a vector with the given `word`.
     ///
     /// If the `word` is not found in the dataset, `SpellChecker::suggest_for_word()` will be used.
     ///
     /// Returns the result vector, sorted by the distance, and takes the first `take_first_x` elements.
-    fn suggest(&self, word: &str, take_first_x: usize) -> Vec<&str> {
+    fn suggest(&self, word: &str) -> Vec<&str> {
         let result = self.suggest_with_distances(word);
-        if take_first_x == 0 {
-            result.into_iter().map(|(word, _)| word).collect()
-        } else {
-            result
-                .into_iter()
-                .take(take_first_x)
-                .map(|(word, _)| word)
-                .collect()
-        }
+        result
+            .into_iter()
+            .take(self.max_distance())
+            .map(|(word, _)| word)
+            .collect()
     }
 }
+
+// impl SpellChecker {
+//     /// Creates a new `SpellChecker` from the given `file`.
+//     ///
+//     /// The `file` should be formated acording to [Dataset Fixer](https://github.com/Zefirchiky/easy-spell-checker/tree/ca505359efdc0a862d3418ae3c8b9f0418a9f25e/dataset_fixer) (see also `load_words_dict()`)
+//     pub fn new(file: impl AsRef<Path>) -> Self {
+//         let len_groups = load_words_dict(file).unwrap();
+//         Self {
+//             word_groups: len_groups,
+//             max_dif: 2,
+//             // added_words: vec![],
+//             // added_words_treshhold: 20,
+//         }
+//     }
+
+//     pub fn add(&mut self, word: String) -> &mut Self {
+//         // self.added_words.push(word);
+//         // if self.added_words.len() >= self.added_words_treshhold {
+//         //     self.save()
+//         // }
+//         let res = self.find_closest(&word);
+//         if let Some((lg, BinarySearchWordResult::NotFound(o1, _))) = res {
+//             let i = lg.len - 1;
+//             self.word_groups
+//                 .get_mut(i)
+//                 .unwrap()
+//                 .blob
+//                 .insert_str(o1, &word); // FIXME: Inefficient, needs to move all the words after. It should also be responsibility of LenGroup
+//         }
+//         self
+//     }
+
+//     pub fn save(&mut self) {
+//         // let added_words = mem::take(&mut self.added_words);
+//         // for word in added_words {
+//         //     let wlen = word.len();
+//         //     while wlen - 1 > self.len_groups.len() {
+//         //         self.len_groups.push(LenGroup::empty(self.len_groups.len() as u16));
+//         //     }
+//         //     if wlen - 1 == self.len_groups.len() {
+//         //         self.len_groups.push(LenGroup {
+//         //             blob: word,
+//         //             len: wlen as u16,
+//         //             count: 1,
+//         //         });
+//         //     } else {
+//         //         self.len_groups[wlen-1].blob.push_str(&word);
+//         //     }
+//         // }
+
+//         // for gr in self.len_groups {
+//         //     gr.blob.
+//         // }
+//     }
+
+//     /// Gets a word from the dataset.
+//     pub fn get(&self, word: WordId) -> Option<&str> {
+//         let lg = self.word_groups.get(word.len)?;
+//         if word.offset >= lg.blob.len() {
+//             None
+//         } else {
+//             Some(&lg.blob[word.offset..word.offset + word.len])
+//         }
+//     }
+
+//     /// Gets a word from the dataset without any checks.
+//     ///
+//     /// This function assumes that the given `WordId` is valid and that the word exists in the dataset.
+//     /// It does not perform any checks on the given `WordId`.
+//     ///
+//     /// # Panics
+//     ///
+//     /// This function will panic if the given `WordId` is invalid or if the word does not exist in the dataset.
+//     pub fn get_unchecked(&self, word: WordId) -> &str {
+//         let lg = self
+//             .word_groups
+//             .get(word.len)
+//             .expect(&format!("LenGroup of len {} should exist", word.len));
+//         &lg.blob[word.offset..word.offset + word.len]
+//     }
+
+//     /// Checks if a word exists in the dataset.
+//     ///
+//     /// Returns true if the word exists, false otherwise.
+//     pub fn check(&self, word: &str) -> bool {
+//         let group = self.word_groups.get(word.len());
+//         match group {
+//             Some(lg) => lg.check(word),
+//             None => false,
+//         }
+//     }
+
+//     pub fn batch_check<'a>(&self, words: &'a [&str]) -> Vec<(&'a str, bool)> {
+//         words.iter().map(|&word| (word, self.check(word))).collect()
+//     }
+
+//     pub fn batch_par_check<'a>(&self, words: &'a [&str]) -> Vec<(&'a str, bool)> {
+//         words
+//             .par_iter()
+//             .map(|&word| (word, self.check(word)))
+//             .collect()
+//     }
+
+//     pub fn find(&self, word: &str) -> Option<WordId> {
+//         let group = self.word_groups.get(word.len())?;
+//         Some(WordId {
+//             len: group.len,
+//             offset: group.find(word)?.0,
+//         })
+//     }
+
+//     pub fn find_closest<'a>(&self, word: &str) -> Option<(&WordGroup, BinarySearchWordResult)> {
+//         let group = self.word_groups.get(word.len())?;
+//         Some((group, group.find_closest(word)?))
+//     }
+
+//     /// Finds all words in the dataset that are similar to the given `word`.
+//     ///
+//     /// Similarity is defined as the maximum number of `deletions`, `insertions`, and `substitutions` that can be done to match the two words.
+//     /// The maximum difference is specified by the `max_dif` field of the `SpellChecker`.
+//     ///
+//     /// The function returns a vector of tuples, where the first element of the tuple is the similar word, and the second element is the distance between the two words.
+//     ///
+//     /// The function uses a parallel iterator to search for similar words in the dataset.
+//     ///
+//     /// The function first filters out all words that are not of the same length as the given `word`, or that have a difference greater than the maximum difference.
+//     /// It then uses the `matches_single` function to check if each word is similar to the given `word`.
+//     /// If a word is similar, it is added to the result vector.
+//     ///
+//     /// The function finally collects the result vector and returns it.
+//     pub fn suggest_for_word(&self, word: &[u8]) -> Vec<(&str, usize)> {
+//         let word_len = word.len();
+
+//         let min_len = word_len.saturating_sub(self.max_dif - 1);
+//         let max_len = (word_len + self.max_dif).min(self.word_groups.len());
+
+//         let first_char = word[0];
+//         let last_char = word[word_len - 1];
+//         let words = &self.word_groups[min_len..max_len];
+//         words
+//             .par_iter()
+//             .filter(|group| group.count > 0)
+//             .flat_map(|group| {
+//                 let dif = group.len as isize - word_len as isize;
+//                 let abs_dif = dif.abs() as usize;
+
+//                 let max_del = dif.max(0) as usize;
+//                 let max_ins = (-dif).max(0) as usize;
+//                 let max_chg = self.max_dif - abs_dif;
+
+//                 group
+//                     .blob
+//                     .as_bytes()
+//                     .par_chunks(group.len)
+//                     .filter_map(|ch| {
+//                         if abs_dif == self.max_dif {
+//                             if ch[0] != first_char
+//                                 && ch[0] != last_char
+//                                 && ch[ch.len() - 1] != first_char
+//                                 && ch[ch.len() - 1] != last_char
+//                             {
+//                                 return None;
+//                             }
+//                         }
+
+//                         let (is_ok, dist) =
+//                             matching::matches_single(ch, word, max_del, max_ins, max_chg);
+//                         if is_ok {
+//                             // Dataset will always be valid, and chars are based on len group. Cant have invalid utf-8.
+//                             // Trust
+//                             Some((unsafe { from_utf8_unchecked(ch) }, dist))
+//                         } else {
+//                             None
+//                         }
+//                     })
+//                     .collect::<Vec<_>>()
+//             })
+//             .collect()
+//     }
+
+//     /// Suggests words for a given `word` based on the maximum difference specified in the constructor.
+//     ///
+//     /// If the `word` is found in the dataset, returns a vector with the given `word`.
+//     ///
+//     /// If the `word` is not found in the dataset, `SpellChecker::suggest_for_word()` will be used.
+//     ///
+//     /// Returns the result vector, sorted by the distance, and takes the first `take_first_x` elements.
+//     pub fn suggest(&self, word: &str, take_first_x: usize) -> Vec<&str> {
+//         let word = word.to_lowercase();
+
+//         if let Some(word) = self.find(&word) {
+//             return vec![self.get_unchecked(word)];
+//         }
+
+//         let word_bytes = word.as_bytes();
+//         let mut result = self.suggest_for_word(word_bytes);
+
+//         if result.len() > 1 {
+//             result.par_sort_unstable_by_key(|(_, dist)| *dist);
+//             result.reverse();
+//         }
+
+//         if take_first_x == 0 {
+//             result.into_iter().map(|(word, _)| word).collect()
+//         } else {
+//             result
+//                 .into_iter()
+//                 .take(take_first_x)
+//                 .map(|(word, _)| word)
+//                 .collect()
+//         }
+//     }
+
+//     /// Suggests words for each `word` in the given `words` vector based on the maximum difference specified in the constructor.
+//     ///
+//     /// If a `word` is found in the dataset, returns a vector with the given `word`.
+//     ///
+//     /// If a `word` is not found in the dataset, `SpellChecker::suggest_for_word()` will be used.
+//     ///
+//     /// Returns the result vector, sorted by the distance, and takes the first `take_first_x` elements.
+//     ///
+//     pub fn batch_suggest<'a>(
+//         &self,
+//         words: &'a [&str],
+//         take_first_x: usize,
+//     ) -> Vec<(&'a str, Vec<&str>)> {
+//         self.batch_suggest_iter(words, take_first_x).collect()
+//     }
+
+//     /// Iterates over each `word` in the given `words` vector and calls the given `callback` function with the suggestions for each word.
+//     ///
+//     /// The `callback` function will be called with two arguments: the original `word`, and a vector of suggestions for that word.
+//     ///
+//     /// The suggestions vector will contain all words that are at most `max_dif` away from the given `word`.
+//     ///
+//     /// The suggestions vector will be sorted by the distance, with the closest words first.
+//     /// If the `word` is found in the dataset, the suggestions vector will contain the given `word`.
+//     ///
+//     /// The `callback` function will be called for each `word` in the given `words` vector.
+//     pub fn batch_suggest_with<F>(&self, words: &[&str], take_first_x: usize, mut callback: F)
+//     where
+//         F: FnMut(&str, Vec<&str>),
+//     {
+//         words.iter().for_each(move |word| {
+//             let suggestions = self.suggest(word, take_first_x);
+//             callback(word, suggestions)
+//         });
+//     }
+
+//     /// Iterates over each `word` in the given `words` vector and calls `suggest` function with the given `word` and `take_first_x`.
+//     ///
+//     /// The `suggest` function will return a vector of suggestions for each word, sorted by the distance, with the closest words first.
+//     ///
+//     /// The `suggest` function will also return the given `word` if it is found in the dataset.
+//     ///
+//     /// The `suggest` function will take the first `take_first_x` elements of the suggestions vector.
+//     ///
+//     /// The function returns an iterator over the suggestions vectors.
+//     pub fn batch_suggest_iter<'a>(
+//         &self,
+//         words: &'a [&str],
+//         take_first_x: usize,
+//     ) -> impl Iterator<Item = (&'a str, Vec<&str>)> {
+//         words
+//             .iter()
+//             .map(move |&word| (word, self.suggest(word, take_first_x)))
+//     }
+
+//     /// Iterates over each `word` in the given `words` vector and calls `suggest` function with the given `word` and `take_first_x`.
+//     ///
+//     /// The `suggest` function will return a vector of suggestions for each word, sorted by the distance, with the closest words first.
+//     ///
+//     /// The `suggest` function will also return the given `word` if it is found in the dataset.
+//     ///
+//     /// The `suggest` function will take the first `take_first_x` elements of the suggestions vector.
+//     ///
+//     /// The function returns an iterator over the suggestions vectors.
+//     ///
+//     /// This function is the same as `batch_suggest`, but it uses rayon's parallel iterator, which means it will use all available CPU cores in parallel to suggest words for all given words.
+//     ///
+//     /// The function returns a vector of suggestions vectors.
+//     ///
+//     /// The function is parallel, and will use all available CPU cores in parallel.
+//     pub fn batch_par_suggest<'a>(
+//         &self,
+//         words: &'a [&str],
+//         take_first_x: usize,
+//     ) -> Vec<(&'a str, Vec<&str>)> {
+//         self.batch_par_suggest_iter(words, take_first_x).collect()
+//     }
+
+//     /// Iterates over each `word` in the given `words` vector and calls the given `callback` function with the suggestions for each word.
+//     ///
+//     /// The `callback` function will be called with two arguments: the original `word`, and a vector of suggestions for that word.
+//     ///
+//     /// The suggestions vector will contain all words that are at most `max_dif` away from the given `word`.
+//     ///
+//     /// The suggestions vector will be sorted by the distance, with the closest words first.
+//     /// If the `word` is found in the dataset, the suggestions vector will contain the given `word`.
+//     ///
+//     /// The `callback` function will be called for each `word` in the given `words` vector.
+//     ///
+//     /// The function is parallel, and will use all available CPU cores in parallel.
+//     pub fn batch_par_suggest_with<F>(&self, words: &[&str], take_first_x: usize, callback: F)
+//     where
+//         F: FnMut(&str, Vec<&str>) + Send + Sync + Clone,
+//     {
+//         words.par_iter().for_each_with(callback, move |cb, word| {
+//             let suggestions = self.suggest(word, take_first_x);
+//             cb(word, suggestions)
+//         });
+//     }
+
+//     /// Iterates over each `word` in the given `words` vector and calls `suggest` function with the given `word` and `take_first_x`.
+//     ///
+//     /// The `suggest` function will return a vector of suggestions for each word, sorted by the distance, with the closest words first.
+//     ///
+//     /// If the `word` is found in the dataset, the suggestions vector will contain the given `word`.
+//     ///
+//     /// The `suggest` function will take the first `take_first_x` elements of the suggestions vector.
+//     ///
+//     /// The function returns a parallel iterator over the suggestions vectors.
+//     pub fn batch_par_suggest_iter<'a>(
+//         &self,
+//         words: &'a [&str],
+//         take_first_x: usize,
+//     ) -> impl ParallelIterator<Item = (&'a str, Vec<&str>)> {
+//         words
+//             .par_iter()
+//             .map(move |&word| (word, self.suggest(word, take_first_x)))
+//     }
+// }

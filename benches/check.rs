@@ -1,15 +1,13 @@
 #![feature(test)]
 extern crate test;
 #[cfg(test)]
-mod tests {
-    use spel_right::SpellChecker;
+mod check {
+    use spel_right::{English, SpellChecker};
     use test::Bencher;
-
-    static WORDS_FILE: &str = "words.txt";
 
     #[bench]
     fn iter_100000_correct_words(b: &mut Bencher) {
-        let checker = SpellChecker::new(WORDS_FILE);
+        let checker = SpellChecker::<English>::new();
         let bench_words: [&str; 30] = [
             "the",
             "quick",
@@ -54,7 +52,7 @@ mod tests {
 
     #[bench]
     fn par_iter_100000_correct_words(b: &mut Bencher) {
-        let checker = SpellChecker::new(WORDS_FILE);
+        let checker = SpellChecker::<English>::new();
         let bench_words: [&str; 30] = [
             "the",
             "quick",

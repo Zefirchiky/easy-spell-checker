@@ -1,5 +1,6 @@
 use crate::Language;
 
+#[derive(Debug, Default)]
 pub struct English;
 
 impl Language for English {

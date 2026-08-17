@@ -1,14 +1,9 @@
-use std::env::{self, current_exe};
+use std::env::self;
 
-use spel_right::SpellChecker;
+use spel_right::{English, SpellChecker};
 
 fn main() {
-    let path = current_exe().unwrap();
-    let path = path.parent().unwrap();
-    let path = path.join("words.txt");
-
-    let mut checker = SpellChecker::new(path);
-    checker.max_dif = 4;
+    let checker = SpellChecker::<English>::new();
 
     let mut return_elements = 10;
     let args: Vec<String> = env::args().collect();
@@ -24,8 +19,8 @@ fn main() {
             Some(s)
         })
         .collect();
-
-    let suggestions = checker.batch_par_suggest(&words_to_check, return_elements);
+    
+    let suggestions = checker.batch_par_suggest(&words_to_check);
 
     for (word, suggestion) in suggestions {
         if suggestion.is_empty() {

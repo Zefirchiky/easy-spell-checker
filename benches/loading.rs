@@ -1,14 +1,12 @@
 #![feature(test)]
 extern crate test;
 #[cfg(test)]
-mod tests {
-    use spel_right::load_words_dict;
+mod loading {
+    use spel_right::{English, SpellChecker};
     use test::Bencher;
-
-    static WORDS_FILE: &str = "words.txt";
 
     #[bench]
     fn words_loading_from_file(b: &mut Bencher) {
-        b.iter(|| load_words_dict(WORDS_FILE));
+        b.iter(|| SpellChecker::<English>::new());
     }
 }

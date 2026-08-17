@@ -1,16 +1,16 @@
 [package]
 name = "spel-right"
 description = "A fast and lightweight spell checker and suggester."
-version = "0.5.3"
+version = "0.6.0"
 edition = "2024"
 license-file = "LICENSE"
 repository = "https://github.com/Zefirchiky/SpelRight"
 
 [dependencies]
-filess = { version = "0.6.2", default-features = false, features = ["serde_json"] }
-rayon = "1.11.0"
-serde = { version = "1.0.228", features = ["serde_derive"] }
-serde_json = "1.0.149"
+directories = "6.0.0"
+filess = { version = "0.9.0", default-features = false, features = ["dirs", "json", "txt"] }
+rayon = "1.12.0"
+serde = { version = "1.0.229", features = ["serde_derive"] }
 unicode-normalization = "0.1.25"
 
 [profile.dev]
@@ -20,8 +20,8 @@ incremental = true
 codegen-units = 1
 lto = true
 opt-level = 3
-panic = "abort"
-strip = true
+# panic = "abort"
+# strip = true
 
 [dev-dependencies]
 criterion = "0.7.0"

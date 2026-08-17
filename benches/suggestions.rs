@@ -1,22 +1,20 @@
 #![feature(test)]
 extern crate test;
 #[cfg(test)]
-mod tests {
-    use spel_right::SpellChecker;
+mod suggest {
+    use spel_right::{English, SpellChecker};
     use test::Bencher;
-
-    static WORDS_FILE: &str = "words.txt";
 
     #[bench]
     fn batch_suggest_6_f_words(b: &mut Bencher) {
-        let checker = SpellChecker::new(WORDS_FILE);
+        let checker = SpellChecker::<English>::new();
         let bench_words = vec!["hell", "beeuty", "chill", "fucts", "chungus", "mayonese"];
-        b.iter(|| checker.batch_par_suggest(&bench_words, 10))
+        b.iter(|| checker.batch_par_suggest(&bench_words))
     }
 
     #[bench]
     fn batch_suggest_30_correct_words(b: &mut Bencher) {
-        let checker = SpellChecker::new(WORDS_FILE);
+        let checker = SpellChecker::<English>::new();
         let bench_words: [&str; 30] = [
             "the",
             "quick",
@@ -49,12 +47,12 @@ mod tests {
             "system",
             "function",
         ];
-        b.iter(|| checker.batch_suggest(&bench_words, 10));
+        b.iter(|| checker.batch_suggest(&bench_words));
     }
 
     #[bench]
     fn batch_suggest_30_incorrect_words(b: &mut Bencher) {
-        let checker = SpellChecker::new(WORDS_FILE);
+        let checker = SpellChecker::<English>::new();
         let bench_words: [&str; 30] = [
             "teh",         // Transposition (the)
             "quik",        // Omission (quick)
@@ -87,13 +85,13 @@ mod tests {
             "sistem",      // Substitution (system)
             "funciton",    // Transposition (function)
         ];
-        b.iter(|| checker.batch_par_suggest(&bench_words, 10))
+        b.iter(|| checker.batch_par_suggest(&bench_words))
     }
 
     #[bench]
     // #[ignore = "too long"]
     fn batch_suggest_1000_incorrect_words_all_suggestons(b: &mut Bencher) {
-        let checker = SpellChecker::new(WORDS_FILE);
+        let checker = SpellChecker::<English>::new();
         // checker.set_max_dif(4);
         let bench_words: [&str; 30] = [
             "teh",         // Transposition (the)
@@ -134,12 +132,12 @@ mod tests {
             words.push(bench_words[i % len]);
         }
 
-        b.iter(|| checker.batch_par_suggest(&words, 0))
+        b.iter(|| checker.batch_par_suggest(&words))
     }
 
     #[bench]
     fn batch_suggestions_24_mix(b: &mut Bencher) {
-        let checker = SpellChecker::new(WORDS_FILE);
+        let checker = SpellChecker::<English>::new();
 
         let bench_words = vec![
             "hello",
@@ -167,12 +165,12 @@ mod tests {
             "xyz123",
             "supercalifragilisticexpialidocious",
         ];
-        b.iter(|| checker.batch_par_suggest(&bench_words, 10))
+        b.iter(|| checker.batch_par_suggest(&bench_words))
     }
 
     #[bench]
     fn batch_suggestions_30_mix(b: &mut Bencher) {
-        let checker = SpellChecker::new(WORDS_FILE);
+        let checker = SpellChecker::<English>::new();
 
         let bench_words: [&str; 30] = [
             "the",
@@ -207,6 +205,6 @@ mod tests {
             "statemant",
         ];
 
-        b.iter(|| checker.batch_par_suggest(&bench_words, 10))
+        b.iter(|| checker.batch_par_suggest(&bench_words))
     }
 }

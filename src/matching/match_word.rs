@@ -24,22 +24,6 @@ pub fn matches_single<T: Eq>(
     let mut wi = 0;
     let mut ci = 0;
 
-    // #[cfg(target_arch = "x86_64")]   // ! SMH SLOWER??? And by 20 ms for 1000 words at that, the fuck. Is it the fucking memory alloc or some shit, I'm so frustrated
-    // {
-    //     if is_x86_feature_detected!("avx2") {
-    //         unsafe {
-    //             wi = find_matching_prefix_simd_avx2(word, candidate);
-    //             ci = wi;
-    //         }
-    //     }
-    //     else if is_x86_feature_detected!("sse2") {
-    //         unsafe {
-    //             wi = find_matching_prefix_simd_sse2(word, candidate);
-    //             ci = wi
-    //         }
-    //     }
-    // }
-
     while wi < wlen && ci < clen {
         if word[wi] == candidate[ci] {
             wi += 1;

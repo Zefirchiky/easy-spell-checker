@@ -4,7 +4,7 @@ Yes, it is intentional.
 
 A simple Spell Checker written in Rust. Includes CLI and lib.
 
-Also available in [crates.io](https://crates.io/crates/mangahub-spellchecker)!
+Also available in [crates.io](https://crates.io/crates/spel-right)!
 
 Supports any utf-8 (kinda, WIP), as long as input file is of right format (look [Dataset Fixer](https://github.com/Zefirchiky/SpelRight/blob/49247d1db4ad47746484e1cdd809b7bdec336ffe/dataset_fixer/src/main.rs) or [load_words_dict](https://github.com/Zefirchiky/SpelRight/blob/49247d1db4ad47746484e1cdd809b7bdec336ffe/src/load_dict.rs)).
 
@@ -15,15 +15,18 @@ Was primarily written for [MangaHub](https://github.com/Zefirchiky/MangaHub) pro
 
 ## Some benchmarks
 
-On my i5-12450H laptop with VSC opened.
+Specs:
+CPU: i5-12450H laptop
+RAM: 16GB DDR4
+Programs open: Zed, Zen
 
 English.
 
 Load and parse 4mb file with 370105 words in ~<2ms.
 
-Words spelling check ~90,000,000 words/s for all correct words (worst case scenario, `batch_par_check`).
+Words spelling check ~100,000,000 words/s for all correct words (worst case scenario, `batch_par_check`).
 
-Sorted suggestions for 1000 incorrect words in ~53ms (~18800 words/s, words case scenario, `batch_par_suggest`).
+Sorted suggestions for 1000 incorrect words in ~36ms (~28000 words/s, words case scenario, `batch_par_suggest`).
 
 Memory usage is minimal, a few big strings of all words without a delimiters + a small vec of information.
 Totaling dict size + ~200 bytes (depending on the biggest word's length) + additional cost of some operations.
