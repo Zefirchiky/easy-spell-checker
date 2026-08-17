@@ -4,6 +4,64 @@ use crate::{
     WordGroup, WordId, ascii, matching, spell_checkers::SpellCheckerTrait,
 };
 
+#[derive(Clone, Copy)]
+pub struct MyersPattern {
+    peq: [u64; 256],
+    word_len: usize,
+}
+
+impl MyersPattern {
+    #[inline]
+    pub fn new(word: &[u8]) -> Self {
+        let mut peq = [0u64; 256];
+        let len = word.len().min(64);
+        for i in 0..len {
+            peq[word[i] as usize] |= 1u64 << i;
+        }
+        Self { peq, word_len: len }
+    }
+
+    #[inline(always)]
+    pub fn distance(&self, candidate: &[u8], max_dist: usize) -> Option<usize> {
+        let m = self.word_len;
+        let n = candidate.len();
+
+        if m == 0 {
+            return if n <= max_dist { Some(n) } else { None };
+        }
+
+        let mut vp = !0u64;
+        let mut vn = 0u64;
+        let mut curr_dist = m;
+        let last_bit = 1u64 << (m - 1);
+
+        for &b in candidate {
+            let pm = self.peq[b as usize];
+            let d0 = (((pm & vp).wrapping_add(vp)) ^ vp) | pm | vn;
+            let mut hp = vn | !(d0 | vp);
+            let mut hn = vp & d0;
+
+            if (hp & last_bit) != 0 {
+                curr_dist += 1;
+            }
+            if (hn & last_bit) != 0 {
+                curr_dist -= 1;
+            }
+
+            hp = (hp << 1) | 1;
+            hn <<= 1;
+            vp = hn | !(d0 | hp);
+            vn = hp & d0;
+        }
+
+        if curr_dist <= max_dist {
+            Some(curr_dist)
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct SpellChecker {
     pub(crate) groups: Vec<ascii::WordGroup>,
@@ -59,8 +117,8 @@ impl SpellCheckerTrait for SpellChecker {
         let dif = word_len as isize - group.len as isize;   // < 0 if word is smaller, > 0 if word is bigger
         let abs_dif = dif.abs() as usize;
     
-        let max_del = (-dif).max(0) as usize;
-        let max_ins = dif.max(0) as usize;
+        let max_del = dif.max(0) as usize;
+        let max_ins = (-dif).max(0) as usize;
         let max_sub = (self.max_dist - abs_dif).max(0);
 
         let words_per_batch = (crate::L1_CACHE_TARGET_BYTES / group.len).clamp(128, 4096);
@@ -74,22 +132,13 @@ impl SpellCheckerTrait for SpellChecker {
                     .par_chunks(batch_bytes)
                     .flat_map_iter(|batch| {
                         batch.chunks_exact(group.len).filter_map(move |candidate| {
-                            if candidate[0] != word[0]
-                                && candidate[candidate.len() - 1] != word[word_len - 1]
-                            {
+                            if candidate[0] != word[0] && candidate[candidate.len() - 1] != word[word_len - 1] {
                                 return None;
                             }
             
-                            let (is_ok, dist) =
-                                matching::matches_insertion_only(word, candidate, max_del);
-            
-                            if is_ok {
-                                // SAFETY: Dataset guarantees valid UTF-8 aligned to group.len
-                                // Trust
-                                Some((unsafe { std::str::from_utf8_unchecked(candidate) }, dist))
-                            } else {
-                                None
-                            }
+                            // SAFETY: Dataset guarantees valid UTF-8 aligned to group.len
+                            // Trust
+                            Some((unsafe { std::str::from_utf8_unchecked(candidate) }, matching::matches_insertion_only(word, candidate, max_del)?))
                         })
                     })
                     .collect()
@@ -106,16 +155,9 @@ impl SpellCheckerTrait for SpellChecker {
                                 return None;
                             }
             
-                            let (is_ok, dist) =
-                                matching::matches_deletion_only(word, candidate, max_del);
-            
-                            if is_ok {
-                                // SAFETY: Dataset guarantees valid UTF-8 aligned to group.len
-                                // Trust
-                                Some((unsafe { std::str::from_utf8_unchecked(candidate) }, dist))
-                            } else {
-                                None
-                            }
+                            // SAFETY: Dataset guarantees valid UTF-8 aligned to group.len
+                            // Trust
+                            Some((unsafe { std::str::from_utf8_unchecked(candidate) }, matching::matches_insertion_only(word, candidate, max_del)?))
                         })
                     })
                     .collect()
@@ -127,16 +169,9 @@ impl SpellCheckerTrait for SpellChecker {
                 .par_chunks(batch_bytes)
                 .flat_map_iter(|batch| {
                     batch.chunks_exact(group.len).filter_map(move |candidate| {
-                        let (is_ok, dist) =
-                            matching::matches_single(candidate, word, max_del, max_ins, max_sub);
-        
-                        if is_ok {
-                            // SAFETY: Dataset guarantees valid UTF-8 aligned to group.len
-                            // Trust
-                            Some((unsafe { std::str::from_utf8_unchecked(candidate) }, dist))
-                        } else {
-                            None
-                        }
+                        // SAFETY: Dataset guarantees valid UTF-8 aligned to group.len
+                        // Trust
+                        Some((unsafe { std::str::from_utf8_unchecked(candidate) }, matching::matches_single(word, candidate, max_del, max_ins, max_sub)?))
                     })
                 })
                 .collect()
