@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod suggest_tests {
+mod suggest {
     use spel_right::{English, SpellChecker};
 
     #[test]

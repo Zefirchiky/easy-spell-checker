@@ -23,7 +23,9 @@ pub use filess;
 static PROJECT_DIR: LazyLock<directories::ProjectDirs> =
     LazyLock::new(|| directories::ProjectDirs::from("org", "Kuroda", "SpelRight").unwrap());
 const DICT_VERSION: usize = 1;
+
 const MAX_DIST: usize = 3;
+const L1_CACHE_TARGET_BYTES: usize = 32 * 1024; // 32 KB target
 
 #[derive(Debug, Clone)]
 pub enum Encoding {

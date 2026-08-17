@@ -52,38 +52,95 @@ impl SpellCheckerTrait for SpellChecker {
         })
     }
 
+    #[inline(always)]
     fn match_word_with_group<'a>(&self, group: &'a Self::Group, word: &str) -> Vec<(&'a str, usize)> {
         let word = word.as_bytes();
         let word_len = word.len();
-        let dif = group.len as isize - word_len as isize;
+        let dif = word_len as isize - group.len as isize;   // < 0 if word is smaller, > 0 if word is bigger
         let abs_dif = dif.abs() as usize;
-
-        let max_del = dif.max(0) as usize;
-        let max_ins = (-dif).max(0) as usize;
+    
+        let max_del = (-dif).max(0) as usize;
+        let max_ins = dif.max(0) as usize;
         let max_sub = (self.max_dist - abs_dif).max(0);
-        
-        group
-            .blob
-            .as_bytes()
-            .par_chunks(group.len)
-            .filter_map(|candidate| {
-                if abs_dif == self.max_dist {
-                    if candidate[0] != word[0] && candidate[candidate.len() - 1] != word[word_len - 1] {
-                        return None;
-                    }
-                }
 
-                let (is_ok, dist) =
-                    matching::matches_single(candidate, word, max_del, max_ins, max_sub);
-                if is_ok {
-                    // SAFETY: Dataset will always be valid, and chars are based on len group. Cant have invalid utf-8.
-                    // Trust
-                    Some((unsafe { std::str::from_utf8_unchecked(candidate) }, dist))
-                } else {
-                    None
-                }
-            })
-            .collect()
+        let words_per_batch = (crate::L1_CACHE_TARGET_BYTES / group.len).clamp(128, 4096);
+        let batch_bytes = group.len * words_per_batch;
+
+        if self.max_dist == abs_dif {
+            if dif > 0 {
+                group
+                    .blob
+                    .as_bytes()
+                    .par_chunks(batch_bytes)
+                    .flat_map_iter(|batch| {
+                        batch.chunks_exact(group.len).filter_map(move |candidate| {
+                            if candidate[0] != word[0]
+                                && candidate[candidate.len() - 1] != word[word_len - 1]
+                            {
+                                return None;
+                            }
+            
+                            let (is_ok, dist) =
+                                matching::matches_insertion_only(word, candidate, max_del);
+            
+                            if is_ok {
+                                // SAFETY: Dataset guarantees valid UTF-8 aligned to group.len
+                                // Trust
+                                Some((unsafe { std::str::from_utf8_unchecked(candidate) }, dist))
+                            } else {
+                                None
+                            }
+                        })
+                    })
+                    .collect()
+            } else {
+                group
+                    .blob
+                    .as_bytes()
+                    .par_chunks(batch_bytes)
+                    .flat_map_iter(|batch| {
+                        batch.chunks_exact(group.len).filter_map(move |candidate| {
+                            if candidate[0] != word[0]
+                                && candidate[candidate.len() - 1] != word[word_len - 1]
+                            {
+                                return None;
+                            }
+            
+                            let (is_ok, dist) =
+                                matching::matches_deletion_only(word, candidate, max_del);
+            
+                            if is_ok {
+                                // SAFETY: Dataset guarantees valid UTF-8 aligned to group.len
+                                // Trust
+                                Some((unsafe { std::str::from_utf8_unchecked(candidate) }, dist))
+                            } else {
+                                None
+                            }
+                        })
+                    })
+                    .collect()
+            }
+        } else {
+            group
+                .blob
+                .as_bytes()
+                .par_chunks(batch_bytes)
+                .flat_map_iter(|batch| {
+                    batch.chunks_exact(group.len).filter_map(move |candidate| {
+                        let (is_ok, dist) =
+                            matching::matches_single(candidate, word, max_del, max_ins, max_sub);
+        
+                        if is_ok {
+                            // SAFETY: Dataset guarantees valid UTF-8 aligned to group.len
+                            // Trust
+                            Some((unsafe { std::str::from_utf8_unchecked(candidate) }, dist))
+                        } else {
+                            None
+                        }
+                    })
+                })
+                .collect()
+        }
     }
     
     fn suggest_for_word(&self, word: &str) -> Vec<(&str, usize)> {
